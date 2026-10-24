@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0d0c0f"><title>Watch Together</title>
+<style>
+:root{--ink:#0d0c0f;--char:#1b1a1f;--char2:#26242b;--amber:#f0a83c;--tx:#f4f1ec;--dim:#9b96a0;--bad:#ff6b5e;--ok:#6fd49a;
+--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--ink);color:var(--tx);font:16px/1.4 system-ui,sans-serif;overflow:hidden}
+h1,h2{font-family:Georgia,serif;font-weight:700;margin:0}
+.screen{position:fixed;inset:0;padding:calc(var(--sat) + 16px) 16px calc(var(--sab) + 16px);overflow-y:auto;display:none;background:radial-gradient(120% 60% at 50% 0,#2a2020,var(--ink) 60%)}
+.screen.on{display:block}
+#splash{position:fixed;inset:0;z-index:99;background:var(--ink);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .5s}
+#splash h1{font-size:34px;letter-spacing:.5px}
+.lamp{width:64px;height:64px;border-radius:50%;background:radial-gradient(circle,var(--amber),#7a4a10 70%);box-shadow:0 0 60px var(--amber);margin-bottom:20px;animation:glow 1.6s ease-in-out infinite alternate}
+@keyframes glow{to{box-shadow:0 0 90px var(--amber);transform:scale(1.06)}}
+@media(prefers-reduced-motion:reduce){.lamp{animation:none}}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--dim);margin-right:6px}
+.dot.on{background:var(--ok)}.dot.bad{background:var(--bad)}
+button,input,select{font:inherit;color:var(--tx)}
+button{border:0;border-radius:14px;background:var(--char2);padding:12px 16px;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--amber)}
+button.pri{background:var(--amber);color:#1a1205;font-weight:700}
+button:disabled{opacity:.4}
+input,select,textarea{width:100%;background:var(--char);border:1px solid #38353f;border-radius:12px;padding:12px;color:var(--tx);font:inherit}
+.card{background:var(--char);border-radius:18px;padding:16px;margin-bottom:14px}
+.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}
+.err{color:var(--bad);min-height:1.2em;font-size:14px;margin:6px 0}
+.small{color:var(--dim);font-size:13px}
+.chip{display:inline-block;background:var(--char2);border-radius:20px;padding:4px 12px;margin:0 8px 8px 0;font-size:14px}
+#room{padding:0;display:none;flex-direction:column}
+#room.on{display:flex}
+#roomHead{padding:calc(var(--sat) + 8px) 12px 8px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+#stage{position:relative;background:#000;width:100%;aspect-ratio:16/9;max-height:56vh;display:flex;flex-direction:column}
+#stage:fullscreen{max-height:none;aspect-ratio:auto;height:100%}
+#media{position:relative;flex:1;min-height:0}
+#media video,#media #ytBox,#media iframe{position:absolute;inset:0;width:100%;height:100%;background:#000}
+#ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;color:var(--tx);text-align:center;padding:16px}
+#ov span{background:#000a;padding:8px 14px;border-radius:12px}
+#bar{background:linear-gradient(transparent,#000d);padding:8px 10px;transition:opacity .25s}
+#stage.local #bar{position:absolute;left:0;right:0;bottom:0}
+#stage.local.hide #bar{opacity:0;pointer-events:none}
+#bar .row{gap:6px;margin-top:4px}#bar button{padding:8px 10px;flex:none;min-width:40px;background:#fff1}
+#bar input[type=range]{padding:0;border:0;background:none;accent-color:var(--amber)}
+#bar select{width:auto;padding:6px}
+#panel{flex:1;min-height:0;display:flex;flex-direction:column;padding:8px 12px calc(var(--sab) + 8px)}
+#msgs{flex:1;overflow-y:auto;padding:6px 0}
+.msg{margin:6px 0}.msg b{color:var(--amber)}.msg i{color:var(--dim);font-size:12px;font-style:normal;margin-left:6px}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--char);border-radius:22px 22px 0 0;padding:18px 16px calc(var(--sab) + 18px);transform:translateY(105%);transition:transform .25s;max-height:85vh;overflow-y:auto}
+.sheet.open{transform:none}
+#toast{position:fixed;left:50%;top:calc(var(--sat) + 10px);transform:translateX(-50%);background:var(--char2);padding:10px 16px;border-radius:14px;z-index:120;display:none;max-width:90%}
+@media(orientation:landscape) and (max-height:500px){#room.on{flex-direction:row}#stage{max-height:none;height:100%;width:62%;aspect-ratio:auto}#panel{width:38%}#roomHead{display:none}}
+</style></head><body>
+<div id="splash"><div class="lamp"></div><h1>Watch Together</h1></div>
+<div id="toast" role="status"></div>
+
+<main id="home" class="screen on">
+ <div class="top"><h1>Watch Together</h1><button id="gear" aria-label="Settings">Settings</button></div>
+ <p class="small"><span class="dot" id="cdot"></span><span id="cstat">Not connected</span></p>
+ <div class="card"><h2>Start a room</h2><p class="small">You become the host and pick the video.</p><button class="pri" id="create" style="width:100%">Create room</button></div>
+ <div class="card"><h2>Join a room</h2><input id="joinIn" placeholder="Room code or invite link" autocapitalize="characters" autocomplete="off"><div class="err" id="joinErr"></div><button id="join" style="width:100%">Join room</button></div>
+ <div class="card"><h2>Recent rooms</h2><div id="recent" class="small">Rooms you open will show up here.</div></div>
+</main>
+
+<section id="room">
+ <div id="roomHead"><div><strong id="rcode"></strong><div class="small" id="rmode"></div></div>
+  <div class="row" style="flex:none"><button id="copy">Copy invite</button><button id="leave">Leave</button></div></div>
+ <div id="stage" class="local"><div id="media"><div id="ytBox"></div><video id="vid" playsinline hidden></video><div id="ov"><span id="ovt">No video yet</span></div></div>
+  <div id="bar" hidden>
+   <input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek">
+   <div class="row"><span class="small" id="tm">0:00 / 0:00</span><span style="flex:1"></span>
+    <button id="back">-10</button><button id="pp" class="pri">Play</button><button id="fwd">+10</button>
+    <select id="spd" aria-label="Speed"></select><button id="mute">Mute</button>
+    <input id="vol" type="range" min="0" max="100" value="100" style="width:70px;flex:none" aria-label="Volume"><button id="fs">Full</button></div>
+  </div></div>
+ <div id="panel">
+  <div class="row" style="flex:none;margin-bottom:6px"><button id="srcBtn">Choose video</button><button id="modeBtn">Control mode</button><button id="endBtn">End room</button></div>
+  <div id="members" style="flex:none"></div><div class="small" id="hostWarn"></div>
+  <div id="msgs"></div>
+  <div class="row" style="flex:none"><input id="chatIn" maxlength="500" placeholder="Message" autocomplete="off" enterkeyhint="send"><button id="send" class="pri" style="flex:none">Send</button></div>
+ </div>
+</section>
+
+<div class="sheet" id="sSet"><h2>Settings</h2><p class="small">Your name</p><input id="nm" maxlength="24">
+ <p class="small">Firebase web config (JSON from Project settings, must include databaseURL)</p>
+ <textarea id="fb" rows="6" spellcheck="false" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...","appId":"..."}'></textarea>
+ <div class="err" id="setErr"></div><div class="row"><button id="setSave" class="pri">Save</button><button data-close>Close</button></div></div>
+<div class="sheet" id="sSrc"><h2>Choose video</h2><p class="small">YouTube link (watch or youtu.be)</p><input id="ytIn" placeholder="https://youtu.be/...">
+ <div class="err" id="srcErr"></div><button id="ytGo" class="pri" style="width:100%">Use YouTube video</button>
+ <p class="small" style="margin-top:16px">Offline video: the host picks Local video here, then everyone selects their own copy of the same file. Matching is checked by file size and length.</p>
+ <button id="locGo" style="width:100%">Use local video</button><button data-close style="width:100%;margin-top:8px">Close</button></div>
+<input type="file" id="file" accept="video/mp4,video/webm,video/*" hidden>
+
+<script type="module">
+const $=id=>document.getElementById(id),SPEEDS=[.25,.5,.75,1,1.25,1.5,1.75,2],TOL=.75,V='10.12.2';
+const S={uid:null,db:null,fb:null,code:null,meta:null,members:{},pb:null,rev:0,offset:0,player:null,src:null,un:[],lastSend:0};
+const toast=m=>{const t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',3500)};
+const fmt=s=>{s=Math.max(0,Math.floor(s||0));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')};
+const now=()=>Date.now()+S.offset;
+
+/* ---------- validation + sync logic (unit-tested in the project) ---------- */
+const AL='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const genCode=()=>Array.from(crypto.getRandomValues(new Uint8Array(8)),b=>AL[b&31]).join('');
+const okCode=c=>/^[A-HJ-NP-Z2-9]{8}$/.test(c||'');
+function parseRoom(i){i=(i||'').trim();if(!i)return null;let c=i;try{const u=new URL(i);c=u.searchParams.get('room')||u.pathname.split('/').filter(Boolean).pop()||''}catch{}c=c.toUpperCase();return okCode(c)?c:null}
+function parseYT(i){let u;try{u=new URL((i||'').trim())}catch{return null}
+ if(!['http:','https:'].includes(u.protocol)||!['youtube.com','www.youtube.com','m.youtube.com','youtu.be'].includes(u.hostname))return null;
+ let id=u.hostname==='youtu.be'?u.pathname.slice(1).split('/')[0]:u.pathname==='/watch'?u.searchParams.get('v'):(u.pathname.match(/^\/(embed|shorts)\/([^/]+)/)||[])[2];
+ return /^[\w-]{11}$/.test(id||'')?id:null}
+const expected=(p,t,d=Infinity)=>!p?0:Math.min(Math.max(0,p.position+(p.playing?Math.max(0,(t-p.updatedAt)/1e3)*p.speed:0)),d);
+function nextState(prev,a,t){const b=prev||{rev:0,playing:false,position:0,speed:1,updatedAt:t};const n={...b,position:expected(b,t),updatedAt:t,rev:b.rev+1,by:S.uid};
+ if(a.type==='play')n.playing=true;else if(a.type==='pause')n.playing=false;
+ else if(a.type==='seek'){if(!(a.to>=0))return null;n.position=a.to}
+ else if(a.type==='speed'){if(!SPEEDS.includes(a.value))return null;n.speed=a.value}else return null;return n}
+const canCtl=()=>S.meta&&(S.meta.controlMode==='shared'||S.meta.hostId===S.uid);
+
+/* ---------- screens / settings ---------- */
+const show=id=>{document.querySelectorAll('.screen').forEach(e=>e.classList.toggle('on',e.id===id));$('room').classList.toggle('on',id==='room')};
+const sheet=(id,o)=>$(id).classList.toggle('open',o);
+document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open')));
+const name=()=>(localStorage.wt_name||'Guest').replace(/[\u0000-\u001f<>]/g,'').slice(0,24)||'Guest';
+$('gear').onclick=()=>{$('nm').value=localStorage.wt_name||'';$('fb').value=localStorage.wt_fb||'';$('setErr').textContent='';sheet('sSet',true)};
+$('setSave').onclick=()=>{const f=$('fb').value.trim();
+ if(f){try{const j=JSON.parse(f);if(!j.apiKey||!j.databaseURL)throw 0}catch{$('setErr').textContent='Config must be valid JSON with apiKey and databaseURL.';return}}
+ localStorage.wt_name=$('nm').value.trim()||'Guest';localStorage.wt_fb=f;S.db=null;sheet('sSet',false);status('Not connected',0);toast('Settings saved')};
+function status(t,k){$('cstat').textContent=t;$('cdot').className='dot '+(k===1?'on':k===2?'bad':'')}
+const recent=()=>{let r=[];try{r=JSON.parse(localStorage.wt_recent||'[]')}catch{}return r};
+function drawRecent(){const r=recent();const e=$('recent');e.textContent='';if(!r.length){e.textContent='Rooms you open will show up here.';return}
+ r.forEach(x=>{const b=document.createElement('button');b.className='chip';b.textContent=x.code;b.onclick=()=>joinRoom(x.code);e.appendChild(b)})}
+drawRecent();
+
+/* ---------- Firebase (loaded on demand so the UI works offline) ---------- */
+async function connect(){
+ if(S.db)return;
+ let cfg;try{cfg=JSON.parse(localStorage.wt_fb||'')}catch{throw new Error('Add your Firebase config in Settings first.')}
+ if(!navigator.onLine)throw new Error('No internet connection.');
+ status('Connecting...',0);
+ const w=p=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error('Connection timed out. Check your internet and Firebase config.')),12000))]);
+ try{
+  const [A,Au,D]=await w(Promise.all([import(`https://www.gstatic.com/firebasejs/${V}/firebase-app.js`),import(`https://www.gstatic.com/firebasejs/${V}/firebase-auth.js`),import(`https://www.gstatic.com/firebasejs/${V}/firebase-database.js`)]));
+  const app=A.initializeApp(cfg),auth=Au.getAuth(app);
+  const cred=await w(Au.signInAnonymously(auth));S.uid=cred.user.uid;S.db=D.getDatabase(app);S.fb=D;
+  S.fb.onValue(S.fb.ref(S.db,'.info/serverTimeOffset'),s=>S.offset=s.val()||0);
+  S.fb.onValue(S.fb.ref(S.db,'.info/connected'),s=>status(s.val()?'Connected':'Reconnecting...',s.val()?1:2));
+ }catch(e){S.db=null;status('Offline',2);throw new Error(e.code==='auth/operation-not-allowed'?'Enable Anonymous sign-in in Firebase Authentication.':e.message||'Could not connect.')}
+}
+const R=p=>S.fb.ref(S.db,p);
+
+/* ---------- rooms ---------- */
+$('create').onclick=async()=>{try{await connect();const code=genCode();
+  await S.fb.set(R(`rooms/${code}/meta`),{hostId:S.uid,controlMode:'host',createdAt:Date.now()});
+  await S.fb.set(R(`rooms/${code}/members/${S.uid}`),{name:name(),joinedAt:Date.now(),online:true});
+  enter(code)}catch(e){toast(e.message)}};
+async function joinRoom(i){$('joinErr').textContent='';const code=parseRoom(i);
+ if(!code){$('joinErr').textContent='That is not a valid room code or link.';return}
+ try{await connect();
+  try{await S.fb.set(R(`rooms/${code}/members/${S.uid}`),{name:name(),joinedAt:Date.now(),online:true})}
+  catch{throw new Error('Room not found, or it has ended.')}
+  const m=(await S.fb.get(R(`rooms/${code}/meta`))).val();if(!m||m.ended)throw new Error('This room has ended.');
+  enter(code)}catch(e){$('joinErr').textContent=e.message}}
+$('join').onclick=()=>joinRoom($('joinIn').value);
+function enter(code){S.code=code;S.meta=null;S.members={};S.pb=null;S.rev=0;S.src=null;
+ const r=recent().filter(x=>x.code!==code);r.unshift({code,ts:Date.now()});localStorage.wt_recent=JSON.stringify(r.slice(0,6));drawRecent();
+ $('rcode').textContent='Room '+code;show('room');history.pushState({r:1},'');
+ const mine=R(`rooms/${code}/members/${S.uid}/online`);S.fb.onDisconnect(mine).set(false);S.fb.set(mine,true);
+ const sub=(p,f)=>S.un.push(S.fb.onValue(R(`rooms/${code}/${p}`),f,e=>{toast('Lost access to the room.');leave(true)}));
+ sub('meta',s=>{const m=s.val();if(!m){return}if(m.ended){toast('The host ended this room.');leave(true);return}S.meta=m;drawMode();loadSource(m.source);drawMembers()});
+ sub('members',s=>{S.members=s.val()||{};drawMembers()});
+ sub('playback',s=>{const p=s.val();if(p&&p.rev>S.rev){S.rev=p.rev;S.pb=p;apply()}});
+ S.un.push(S.fb.onValue(S.fb.query(R(`rooms/${code}/chat`),S.fb.limitToLast(100)),s=>drawChat(s.val()||{})));
+}
+async function leave(silent){S.un.forEach(u=>u());S.un=[];destroyPlayer();
+ if(S.code&&S.db)try{await S.fb.set(R(`rooms/${S.code}/members/${S.uid}/online`),false)}catch{}
+ S.code=null;show('home');$('msgs').textContent='';if(!silent&&history.state&&history.state.r)history.back()}
+$('leave').onclick=()=>leave();
+addEventListener('popstate',()=>{if(S.code)leave(true);document.querySelectorAll('.sheet').forEach(s=>s.classList.remove('open'))});
+$('copy').onclick=async()=>{const l=location.href.split(/[?#]/)[0]+'?room='+S.code;try{await navigator.clipboard.writeText(l);toast('Invite copied. The room code is '+S.code)}catch{toast('Copy failed. Room code: '+S.code)}};
+$('endBtn').onclick=async()=>{if(!confirm('End this room for everyone?'))return;try{await S.fb.update(R(`rooms/${S.code}/meta`),{ended:true})}catch(e){toast('Only the host can end the room.')}};
+$('modeBtn').onclick=async()=>{if(S.meta.hostId!==S.uid)return toast('Only the host can change control mode.');
+ try{await S.fb.update(R(`rooms/${S.code}/meta`),{controlMode:S.meta.controlMode==='host'?'shared':'host'})}catch(e){toast('Could not change mode.')}};
+function drawMode(){const h=S.meta.hostId===S.uid;$('rmode').textContent=(S.meta.controlMode==='host'?'Host control':'Shared control')+(h?' (you are host)':'');
+ $('modeBtn').disabled=!h;$('srcBtn').disabled=!h;$('endBtn').disabled=!h;$('modeBtn').textContent=S.meta.controlMode==='host'?'Switch to shared':'Switch to host only'}
+function drawMembers(){const e=$('members');e.textContent='';if(!S.meta)return;const hostFp=(S.members[S.meta.hostId]||{}).fp;
+ Object.entries(S.members).forEach(([id,m])=>{const c=document.createElement('span');c.className='chip';
+  let t=(m.online?'● ':'○ ')+m.name+(id===S.meta.hostId?' (host)':'')+(id===S.uid?' (you)':'');
+  if(S.meta.source&&S.meta.source.type==='local'&&id!==S.meta.hostId)t+=!m.fp?' · no file':hostFp&&m.fp===hostFp?' · file matches':' · file differs';
+  c.textContent=t;e.appendChild(c)});
+ const h=S.members[S.meta.hostId];$('hostWarn').textContent=h&&!h.online&&S.meta.hostId!==S.uid?'Host is offline. '+(S.meta.controlMode==='host'?'Playback cannot be changed until they return.':''):''}
+
+/* ---------- chat ---------- */
+let lastChat=0;
+async function sendChat(){const t=$('chatIn').value.trim();if(!t)return;if(t.length>500)return toast('Messages are limited to 500 characters.');
+ if(Date.now()-lastChat<1000)return toast('Slow down a little.');lastChat=Date.now();
+ try{await S.fb.set(S.fb.push(R(`rooms/${S.code}/chat`)),{uid:S.uid,name:name(),text:t,ts:Date.now()});$('chatIn').value=''}catch{toast('Message not sent. Check your connection.')}}
+$('send').onclick=sendChat;$('chatIn').onkeydown=e=>{if(e.key==='Enter')sendChat()};
+function drawChat(o){const e=$('msgs');e.textContent='';const k=Object.keys(o).sort();
+ if(!k.length){const p=document.createElement('p');p.className='small';p.textContent='No messages yet. Say hello.';e.appendChild(p);return}
+ k.forEach(i=>{const m=o[i],d=document.createElement('div');d.className='msg';const b=document.createElement('b');b.textContent=m.name;
+  const ti=document.createElement('i');ti.textContent=new Date(m.ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  d.append(b,ti,document.createElement('br'),document.createTextNode(String(m.text)));e.appendChild(d)});e.scrollTop=e.scrollHeight}
+
+/* ---------- source selection ---------- */
+$('srcBtn').onclick=()=>{$('srcErr').textContent='';sheet('sSrc',true)};
+const setSource=async s=>{try{await S.fb.update(R(`rooms/${S.code}/meta`),{source:s});await act({type:'pause'});await act({type:'seek',to:0});sheet('sSrc',false)}catch{toast('Could not change the video.')}};
+$('ytGo').onclick=()=>{const id=parseYT($('ytIn').value);if(!id){$('srcErr').textContent='Enter a valid YouTube watch or youtu.be link.';return}setSource({type:'youtube',id})};
+$('locGo').onclick=()=>setSource({type:'local',session:Date.now()});
+
+/* ---------- players ---------- */
+const vid=$('vid');let objUrl=null,ytReady=null;
+function destroyPlayer(){if(S.player&&S.player.destroy)S.player.destroy();S.player=null;S.src=null;vid.pause();vid.removeAttribute('src');vid.load();vid.hidden=true;if(objUrl){URL.revokeObjectURL(objUrl);objUrl=null}$('ytBox').textContent='';$('bar').hidden=true}
+function overlay(t){$('ovt').textContent=t||'';$('ov').style.display=t?'flex':'none'}
+function loadSource(s){const key=s?JSON.stringify(s):'';if(key===S.src)return;destroyPlayer();S.src=key;
+ if(!s)return overlay(S.meta.hostId===S.uid?'Tap "Choose video" to begin':'Waiting for the host to choose a video');
+ $('stage').classList.toggle('local',s.type==='local');
+ if(s.type==='youtube')initYT(s.id);else initLocal()}
+function initLocal(){overlay('Select your copy of the video');vid.hidden=false;
+ const pick=()=>{if(S.player)return;$('file').click()};$('ov').style.pointerEvents='auto';$('ov').onclick=pick;
+ $('file').onchange=()=>{const f=$('file').files[0];if(!f)return;if(!vid.canPlayType(f.type||'video/mp4')&&!f.type.startsWith('video/'))return toast('That file is not a supported video.');
+  if(objUrl)URL.revokeObjectURL(objUrl);objUrl=URL.createObjectURL(f);vid.src=objUrl;
+  vid.onerror=()=>{overlay('This device cannot play that format. Pick an MP4 or WebM.');S.player=null};
+  vid.onloadedmetadata=async()=>{S.player=localAdapter();overlay(f.name);setTimeout(()=>overlay(''),2500);$('ov').style.pointerEvents='none';$('bar').hidden=false;
+   try{await S.fb.update(R(`rooms/${S.code}/members/${S.uid}`),{fp:f.size+':'+Math.round(vid.duration)})}catch{}
+   $('seek').disabled=false;apply();ctlLoop()};
+  vid.onwaiting=()=>overlay('Buffering...');vid.onplaying=()=>overlay('')};
+ $('file').value=''}
+const localAdapter=()=>({ready:true,time:()=>vid.currentTime,dur:()=>vid.duration||0,seek:t=>{vid.currentTime=t},rate:r=>{vid.playbackRate=r},
+ play:()=>vid.play().catch(()=>overlay('Tap the screen to start playback')),pause:()=>vid.pause(),playing:()=>!vid.paused,vol:v=>{vid.volume=v},mute:m=>{vid.muted=m}});
+function initYT(id){overlay('Loading YouTube...');$('bar').hidden=false;
+ const make=()=>{const box=document.createElement('div');$('ytBox').appendChild(box);
+  const p=new YT.Player(box,{videoId:id,width:'100%',height:'100%',playerVars:{controls:0,playsinline:1,rel:0,disablekb:1,fs:0},events:{
+   onReady:()=>{S.player={ready:true,destroy:()=>p.destroy(),time:()=>p.getCurrentTime(),dur:()=>p.getDuration(),seek:t=>p.seekTo(t,true),rate:r=>p.setPlaybackRate(r),
+     play:()=>p.playVideo(),pause:()=>p.pauseVideo(),playing:()=>p.getPlayerState()===1,vol:v=>p.setVolume(v*100),mute:m=>m?p.mute():p.unMute()};overlay('');apply();ctlLoop()},
+   onStateChange:e=>overlay(e.data===3?'Buffering...':''),
+   onError:e=>{const msg={2:'This YouTube link is invalid.',5:'YouTube could not play this video here.',100:'This video was removed or is private.',101:'The owner does not allow embedding.',150:'The owner does not allow embedding.',153:'YouTube blocked playback in this app.'}[e.data]||'YouTube playback failed.';
+    overlay(msg+' Synchronized playback is unavailable. Open it on YouTube instead.');$('ov').style.pointerEvents='auto';$('ov').onclick=()=>window.open('https://www.youtube.com/watch?v='+id,'_blank')}}})};
+ if(window.YT&&YT.Player)return make();
+ window.onYouTubeIframeAPIReady=make;if(!ytReady){ytReady=1;const s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';s.onerror=()=>overlay('Could not load YouTube. Check your connection.');document.head.appendChild(s)}}
+
+/* ---------- sync + controls ---------- */
+const guard={n:0};
+function apply(){const p=S.pb,pl=S.player;if(!p||!pl||!pl.ready)return;const d=pl.dur()||Infinity,e=expected(p,now(),d);
+ guard.n++;try{if(pl.rate)pl.rate(p.speed);if(Math.abs(pl.time()-e)>TOL)pl.seek(e);p.playing?pl.play():pl.pause()}finally{setTimeout(()=>guard.n--,300)}
+ $('pp').textContent=p.playing?'Pause':'Play';$('spd').value=p.speed}
+async function act(a){if(!canCtl()){toast(S.meta&&S.meta.controlMode==='host'?'Only the host controls playback.':'You cannot control playback.');apply();return}
+ try{await S.fb.runTransaction(R(`rooms/${S.code}/playback`),cur=>nextState(cur,a,now())||undefined)}catch{toast('Sync failed. Check your connection.')}}
+$('pp').onclick=()=>act({type:S.pb&&S.pb.playing?'pause':'play'});
+const jump=d=>S.player&&act({type:'seek',to:Math.min(Math.max(0,expected(S.pb,now())+d),S.player.dur()||1e9)});
+$('back').onclick=()=>jump(-10);$('fwd').onclick=()=>jump(10);
+SPEEDS.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s+'x';$('spd').appendChild(o)});$('spd').value=1;
+$('spd').onchange=()=>act({type:'speed',value:+$('spd').value});
+let drag=false;$('seek').oninput=()=>{drag=true;if(S.player)$('tm').textContent=fmt($('seek').value/1000*S.player.dur())+' / '+fmt(S.player.dur())};
+$('seek').onchange=()=>{drag=false;if(S.player)act({type:'seek',to:$('seek').value/1000*S.player.dur()})};
+let muted=false;$('mute').onclick=()=>{muted=!muted;S.player&&S.player.mute(muted);$('mute').textContent=muted?'Unmute':'Mute'};
+$('vol').oninput=()=>S.player&&S.player.vol($('vol').value/100);
+$('fs').onclick=async()=>{try{document.fullscreenElement?await document.exitFullscreen():await $('stage').requestFullscreen()}catch{toast('Fullscreen is not available here.')}};
+let ctl=null;function ctlLoop(){clearInterval(ctl);let n=0;ctl=setInterval(()=>{const pl=S.player;if(!pl||!S.code)return clearInterval(ctl);
+ if(!drag){const d=pl.dur()||0;if(d){$('seek').value=pl.time()/d*1000;$('tm').textContent=fmt(pl.time())+' / '+fmt(d)}}
+ if(++n%8===0)apply()},500)}
+// tap to show controls (local video), double-tap to seek
+let hideT=null,lastTap=0;const stage=$('stage');
+function wake(){stage.classList.remove('hide');clearTimeout(hideT);hideT=setTimeout(()=>{if(S.player&&S.player.playing())stage.classList.add('hide')},3000)}
+$('media').addEventListener('click',e=>{if(!stage.classList.contains('local'))return;const t=Date.now(),r=$('media').getBoundingClientRect();
+ if(t-lastTap<300&&S.player){jump(e.clientX<r.left+r.width/2?-10:10)}else{wake();apply()}lastTap=t});
+addEventListener('beforeunload',()=>{if(objUrl)URL.revokeObjectURL(objUrl)});
+
+/* ---------- boot ---------- */
+const q=new URLSearchParams(location.search).get('room');if(q)$('joinIn').value=q;
+setTimeout(()=>{$('splash').style.opacity=0;setTimeout(()=>$('splash').remove(),500)},900);
+addEventListener('online',()=>status(S.db?'Connected':'Not connected',S.db?1:0));
+addEventListener('offline',()=>status('No internet',2));
+</script></body></html>
